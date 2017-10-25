@@ -18,30 +18,30 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
-
 package net.nikr.memory;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
-import java.util.Scanner;
-
+import java.util.Map;
+import java.util.Properties;
+import javax.swing.JOptionPane;
 
 public final class Main {
 
-	public static final String JAR = "jtest.jar";
-	public static final String PROGRAM_VERSION = "1.1.0";
-	private static final String OK_KEY = "jmemory ok";
-
-	private static final String[] XMX = {"-Xmx4g", "-Xmx3g", "-Xmx2g", "-Xmx1g"};
-	
+	public static final String PROGRAM_VERSION = "3.0.0";
 
 	/**
 	 * Entry point for jMemory.
+	 *
 	 * @param args the command line arguments
 	 */
 	public static void main(final String[] args) {
@@ -50,50 +50,39 @@ public final class Main {
 		main.work(args);
 	}
 
-	private Main() { }
+	public static String getJarFile() {
+		return getProperties("jarfile.properties", null).getProperty("jarfile", "No config");
+	}
+
+	private Main() {
+		
+	}
 
 	private void work(final String[] args) {
-		execute(getLocalFile(JAR), args);
+		execute(getLocalFile(getJarFile()), args);
 	}
 
 	private void execute(final String jarFile, final String[] args) {
-		execute(jarFile, args, 0);
-	}
-
-	private void execute(final String jarFile, final String[] args, int index) {
-		if (index >= XMX.length) {
-			throw new RuntimeException("I give up, tried all possibles");
-		}
-		System.out.println("Trying: " + XMX[index]);
 		ProcessBuilder processBuilder = new ProcessBuilder();
 		processBuilder.redirectErrorStream(true);
 		processBuilder.directory(getJavaHome());
 		List<String> commands = new ArrayList<String>();
-		commands.add("java");
-		commands.add(XMX[index]);
+		if (isWindows()) {
+			commands.add("javaw");
+		} else {
+			commands.add("java");
+		}
+		commands.add("-Xmx" + getProperties("jmemory.properties", Collections.singletonMap("xmx", "1g")).getProperty("xmx", "1g"));
 		commands.add("-jar");
 		commands.add(jarFile);
 		commands.addAll(Arrays.asList(args));
-
 		processBuilder.command(commands);
 		try {
-			Process process = processBuilder.start();
-			process.waitFor();
-			String returnValue = convertStreamToString(process.getInputStream());
-			if (!returnValue.contains(OK_KEY)) {
-				index++;
-				execute(jarFile, args, index);
-			}
+			Process start = processBuilder.start();
+			System.exit(0);
 		} catch (IOException ex) {
 			throw new RuntimeException(ex.getMessage(), ex);
-		} catch (InterruptedException ex) {
-			throw new RuntimeException(ex.getMessage(), ex);
 		}
-	}
-
-	static String convertStreamToString(InputStream is) {
-		Scanner s = new Scanner(is).useDelimiter("\\A");
-		return s.hasNext() ? s.next() : "";
 	}
 
 	private String getLocalFile(final String filename) {
@@ -113,5 +102,58 @@ public final class Main {
 
 	private static File getJavaHome() {
 		return new File(System.getProperty("java.home") + File.separator + "bin");
+	}
+
+	public static boolean isWindows() {
+		return System.getProperty("os.name").startsWith("Windows");
+	}
+
+	private static Properties getProperties(String filename, Map<String, String> defaultValues) {
+		Properties props = new Properties();
+		InputStream input = null;
+		try {
+			input = new FileInputStream(filename);
+			props.load(input);
+			return props;
+		} catch (IOException ex) {
+			if (defaultValues != null)  {
+				for (Map.Entry<String, String> entry : defaultValues.entrySet()) {
+					props.setProperty(entry.getKey(), entry.getValue());
+				}
+				saveProperties(filename, props);
+				return props;
+			} else {
+				JOptionPane.showMessageDialog(null, filename + " not found", "Error", JOptionPane.ERROR_MESSAGE);
+				System.exit(0);
+			}
+			return null;
+		} finally {
+			if (input != null) {
+				try {
+					input.close();
+				} catch (IOException e) {
+					//I give up...
+				}
+			}
+		}
+	}
+
+	private static void saveProperties(String filename, Properties props) {
+		OutputStream output = null;
+		try {
+			output = new FileOutputStream(filename);
+			props.store(output, "");
+		} catch (IOException ex) {
+			JOptionPane.showMessageDialog(null, filename + " cloud not be saved", "Error", JOptionPane.ERROR_MESSAGE);
+			System.exit(0);
+		} finally {
+			if (output != null) {
+				try {
+					output.close();
+				} catch (IOException e) {
+					//I give up...
+				}
+			}
+		}
 	}
 }

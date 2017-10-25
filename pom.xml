@@ -75,6 +75,7 @@
 							<target>
 								<copy todir="${project.build.directory}">
 									<fileset dir="" includes="jtest.jar"/>
+									<fileset dir="" includes="jarfile.properties"/>
 								</copy>
 							</target>
 						</configuration>
