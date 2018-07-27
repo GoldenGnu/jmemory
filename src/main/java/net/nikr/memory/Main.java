@@ -20,11 +20,13 @@
  */
 package net.nikr.memory;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -37,7 +39,10 @@ import javax.swing.JOptionPane;
 
 public final class Main {
 
-	public static final String PROGRAM_VERSION = "3.0.0";
+	public static final String PROGRAM_VERSION = "4.0.0";
+
+	public static final String DEFAULT_XMX_VALUE = "1g";
+	public static final String EXIT_ON = "jmemory ok";
 
 	/**
 	 * Entry point for jMemory.
@@ -63,6 +68,20 @@ public final class Main {
 	}
 
 	private void execute(final String jarFile, final String[] args) {
+		if (System.getProperty("sun.arch.data.model").equals("32")) {
+			int value = JOptionPane.showConfirmDialog(null,
+					"Looks like you're using Java 32bit.\r\n"
+					+ "You should switch to Java 64bit (64x),\r\n"
+					+ "instead of using jmemory.jar\r\n"
+					+ "\r\n"
+					+ "Continue anyway?"
+					+ "\r\n"
+					+ "\r\n",
+					"jMemory", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+			if (value == JOptionPane.NO_OPTION) {
+				System.exit(0);
+			}
+		}
 		ProcessBuilder processBuilder = new ProcessBuilder();
 		processBuilder.redirectErrorStream(true);
 		processBuilder.directory(getJavaHome());
@@ -72,17 +91,43 @@ public final class Main {
 		} else {
 			commands.add("java");
 		}
-		commands.add("-Xmx" + getProperties("jmemory.properties", Collections.singletonMap("xmx", "1g")).getProperty("xmx", "1g"));
+		commands.add("-Xmx" + getProperties("jmemory.properties", Collections.singletonMap("xmx", DEFAULT_XMX_VALUE)).getProperty("xmx", DEFAULT_XMX_VALUE));
 		commands.add("-jar");
 		commands.add(jarFile);
 		commands.addAll(Arrays.asList(args));
 		processBuilder.command(commands);
 		try {
 			Process start = processBuilder.start();
+			String output = processOutput(start);
+			if (output != null && !output.isEmpty()) {
+				JOptionPane.showMessageDialog(null, "JVM ERROR:\r\n" + output+ "\r\n\r\nPress OK to close jMemory\r\n\r\n", "jMemory", JOptionPane.ERROR_MESSAGE);
+			}
 			System.exit(0);
 		} catch (IOException ex) {
 			throw new RuntimeException(ex.getMessage(), ex);
 		}
+	}
+
+	private static String processOutput(Process start) throws IOException {
+		StringBuilder sb = new StringBuilder();
+		BufferedReader br = null;
+		try {
+			br = new BufferedReader(new InputStreamReader(start.getInputStream()));
+			String line;
+			while ((line = br.readLine()) != null) {
+				System.out.println(line);
+				if (line.toLowerCase().contains(EXIT_ON.toLowerCase())) {
+					return null; //exit;
+				}
+				sb.append(line);
+				sb.append(System.getProperty("line.separator"));
+			}
+		} finally {
+			if (br != null) {
+				br.close();
+			}
+		}
+		return sb.toString();
 	}
 
 	private String getLocalFile(final String filename) {
@@ -116,7 +161,7 @@ public final class Main {
 			props.load(input);
 			return props;
 		} catch (IOException ex) {
-			if (defaultValues != null)  {
+			if (defaultValues != null) {
 				for (Map.Entry<String, String> entry : defaultValues.entrySet()) {
 					props.setProperty(entry.getKey(), entry.getValue());
 				}
