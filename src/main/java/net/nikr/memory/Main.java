@@ -28,7 +28,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -39,7 +39,7 @@ import javax.swing.JOptionPane;
 
 public final class Main {
 
-	public static final String PROGRAM_VERSION = "4.0.0";
+	public static final String PROGRAM_VERSION = "4.1.0";
 
 	public static final String DEFAULT_XMX_VALUE = "1g";
 	public static final String EXIT_ON = "jmemory ok";
@@ -64,7 +64,14 @@ public final class Main {
 	}
 
 	private void work(final String[] args) {
-		execute(getLocalFile(getJarFile()), args);
+		String filename = getJarFile();
+		String path = getLocalFile(filename);
+		File file = new File(path);
+		if (!file.exists()) {
+			throw new RuntimeException(filename + " not found");
+		}
+		execute(path, args);
+		
 	}
 
 	private void execute(final String jarFile, final String[] args) {
@@ -94,6 +101,7 @@ public final class Main {
 		commands.add("-Xmx" + getProperties("jmemory.properties", Collections.singletonMap("xmx", DEFAULT_XMX_VALUE)).getProperty("xmx", DEFAULT_XMX_VALUE));
 		commands.add("-jar");
 		commands.add(jarFile);
+		commands.add("-jmemory");
 		commands.addAll(Arrays.asList(args));
 		processBuilder.command(commands);
 		try {
@@ -130,19 +138,15 @@ public final class Main {
 		return sb.toString();
 	}
 
-	private String getLocalFile(final String filename) {
+	private static String getLocalFile(final String filename) {
+		File file;
+		URL location = net.nikr.memory.Main.class.getProtectionDomain().getCodeSource().getLocation();
 		try {
-			File dir = new File(Main.class.getProtectionDomain().getCodeSource().getLocation().toURI()).getParentFile();
-			String fixedFilename = dir.getAbsolutePath() + File.separator + filename;
-			File file = new File(fixedFilename);
-			if (!file.exists()) {
-				throw new RuntimeException(fixedFilename + " not found");
-			} else {
-				return fixedFilename;
-			}
-		} catch (URISyntaxException ex) {
-			throw new RuntimeException(ex.getMessage(), ex);
+			file = new File(location.toURI());
+		} catch (Exception ex) {
+			file = new File(location.getPath());
 		}
+		return file.getParentFile().getAbsolutePath() + File.separator + filename;
 	}
 
 	private static File getJavaHome() {
@@ -157,7 +161,7 @@ public final class Main {
 		Properties props = new Properties();
 		InputStream input = null;
 		try {
-			input = new FileInputStream(filename);
+			input = new FileInputStream(getLocalFile(filename));
 			props.load(input);
 			return props;
 		} catch (IOException ex) {
@@ -186,7 +190,7 @@ public final class Main {
 	private static void saveProperties(String filename, Properties props) {
 		OutputStream output = null;
 		try {
-			output = new FileOutputStream(filename);
+			output = new FileOutputStream(getLocalFile(filename));
 			props.store(output, "");
 		} catch (IOException ex) {
 			JOptionPane.showMessageDialog(null, filename + " cloud not be saved", "Error", JOptionPane.ERROR_MESSAGE);

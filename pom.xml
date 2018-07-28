@@ -4,7 +4,7 @@
 	<groupId>net.nikr</groupId>
 	<artifactId>jmemory</artifactId>
 	<packaging>jar</packaging>
-	<version>4.0.0</version>
+	<version>4.1.0</version>
 	<name>jMemory</name>
 	<url>http://maven.apache.org</url>
 	<build>
@@ -74,8 +74,8 @@
 						<configuration>
 							<target>
 								<copy todir="${project.build.directory}">
-									<fileset dir="" includes="jtest.jar"/>
-									<fileset dir="" includes="jarfile.properties"/>
+									<fileset dir="tools" includes="jtest.jar"/>
+									<fileset dir="tools" includes="jarfile.properties"/>
 								</copy>
 							</target>
 						</configuration>
